@@ -1,0 +1,178 @@
+`timescale 1ns/1ps
+
+module tb_m1_m2_m3;
+
+parameter PIXELS = 276212;
+
+reg clk;
+reg rst_n;
+reg pixel_valid;
+
+reg [7:0] r_in;
+reg [7:0] g_in;
+reg [7:0] b_in;
+
+wire [7:0] gi_out;
+wire gi_valid;
+
+wire [7:0] row0;
+wire [7:0] row1;
+wire [7:0] row2;
+wire [7:0] row3;
+wire [7:0] row4;
+wire [7:0] row5;
+wire [7:0] row6;
+wire [7:0] row7;
+wire [7:0] row8;
+wire [7:0] row9;
+wire [7:0] row10;
+
+wire [7:0] pci_out;
+wire pci_valid;
+
+reg [7:0] red_mem   [0:PIXELS-1];
+reg [7:0] green_mem [0:PIXELS-1];
+reg [7:0] blue_mem  [0:PIXELS-1];
+
+integer i;
+
+//////////////////////////////////////////////////////
+// Module 1
+//////////////////////////////////////////////////////
+
+max_channel DUT1(
+    .clk(clk),
+    .rst_n(rst_n),
+    .pixel_valid(pixel_valid),
+
+    .r_in(r_in),
+    .g_in(g_in),
+    .b_in(b_in),
+
+    .gi_out(gi_out),
+    .gi_valid(gi_valid)
+);
+
+//////////////////////////////////////////////////////
+// Module 2
+//////////////////////////////////////////////////////
+
+line_buffer DUT2(
+    .clk(clk),
+    .rst(~rst_n),
+    .wr_en(gi_valid),
+    .data_in(gi_out),
+
+    .row0(row0),
+    .row1(row1),
+    .row2(row2),
+    .row3(row3),
+    .row4(row4),
+    .row5(row5),
+    .row6(row6),
+    .row7(row7),
+    .row8(row8),
+    .row9(row9),
+    .row10(row10)
+);
+
+//////////////////////////////////////////////////////
+// Module 3
+//////////////////////////////////////////////////////
+
+local_max DUT3(
+    .clk(clk),
+    .rst(~rst_n),
+    .pixel_valid(gi_valid),
+
+    .row0(row0),
+    .row1(row1),
+    .row2(row2),
+    .row3(row3),
+    .row4(row4),
+    .row5(row5),
+    .row6(row6),
+    .row7(row7),
+    .row8(row8),
+    .row9(row9),
+    .row10(row10),
+
+    .pci_out(pci_out),
+    .pci_valid(pci_valid)
+);
+
+//////////////////////////////////////////////////////
+// Clock
+//////////////////////////////////////////////////////
+
+always #5 clk = ~clk;
+
+//////////////////////////////////////////////////////
+// Stimulus
+//////////////////////////////////////////////////////
+
+initial
+begin
+
+    $readmemh("C:/Users/Me/Downloads/red.hex",   red_mem);
+    $readmemh("C:/Users/Me/Downloads/green.hex", green_mem);
+    $readmemh("C:/Users/Me/Downloads/blue.hex",  blue_mem);
+
+    clk = 0;
+    rst_n = 0;
+    pixel_valid = 0;
+
+    r_in = 0;
+    g_in = 0;
+    b_in = 0;
+
+    #20;
+
+    rst_n = 1;
+    pixel_valid = 1;
+
+    for(i=0;i<PIXELS;i=i+1)
+    begin
+        r_in = red_mem[i];
+        g_in = green_mem[i];
+        b_in = blue_mem[i];
+
+        #10;
+    end
+
+    pixel_valid = 0;
+
+    #100;
+
+    $finish;
+end
+
+//////////////////////////////////////////////////////
+// Monitor
+//////////////////////////////////////////////////////
+
+always @(posedge clk)
+begin
+    if(pci_valid)
+    begin
+        $display(
+        "Time=%0t | Gi=%3d | Pci=%3d | Rows=%3d %3d %3d %3d %3d %3d %3d %3d %3d %3d %3d",
+        $time,
+        gi_out,
+        pci_out,
+        row0,row1,row2,row3,row4,row5,row6,row7,row8,row9,row10
+        );
+    end
+end
+
+//////////////////////////////////////////////////////
+// Waveform dump
+//////////////////////////////////////////////////////
+
+initial
+begin
+    $dumpfile("m1_m2_m3.vcd");
+    $dumpvars(0,tb_m1_m2_m3);
+end
+
+endmodule
